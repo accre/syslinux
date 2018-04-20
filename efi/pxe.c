@@ -37,14 +37,34 @@ uint32_t dns_server[DNS_MAX_SERVERS] = {0, };
 
 __export uint32_t pxe_dns(const char *name)
 {
+    uint32_t i;
+    union {
+        unsigned char b[4];
+        uint32_t ip;
+    } q; // potential endianess problem here, right?
+
     /*
      * Return failure on an empty input... this can happen during
      * some types of URL parsing, and this is the easiest place to
      * check for it.
      */
-    if (!name || !*name)
-	return 0;
+    if (!name || !*name){
+        Print(L"No hostname in file URL therefore no DNS lookup needed\n");
+        return 0;
+    }
 
+    /* Is this a dot-quad? */
+    if (sscanf(name, "%hhu.%hhu.%hhu.%hhu",
+            &q.b[0], &q.b[1], &q.b[2], &q.b[3]) == 4) {
+        Print(L"dot-quad IPv4 address given in file URL so no DNS lookup is needed: %d\n",q.ip);
+        return q.ip;
+    }
+
+    for (i=0; i++; i<DNS_MAX_SERVERS){
+        Print(L"DNS server %d is %d\n",i,dns_server[i]);
+    }
+
+    Print(L"WARNING: file URLs needing DNS resolution not yet supported within UEFI boot\nExpect the PXE server IP to be used as a fallback\n");
     return 0;
 }
 
