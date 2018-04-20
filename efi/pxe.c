@@ -38,10 +38,7 @@ uint32_t dns_server[DNS_MAX_SERVERS] = {0, };
 __export uint32_t pxe_dns(const char *name)
 {
     uint32_t i;
-    union {
-        unsigned char b[4];
-        uint32_t ip;
-    } q; // potential endianess problem here, right?
+    struct ip_addr ip;
 
     /*
      * Return failure on an empty input... this can happen during
@@ -53,11 +50,10 @@ __export uint32_t pxe_dns(const char *name)
         return 0;
     }
 
-    /* Is this a dot-quad? */
-    if (sscanf(name, "%hhu.%hhu.%hhu.%hhu",
-            &q.b[0], &q.b[1], &q.b[2], &q.b[3]) == 4) {
+    /* If it is a valid dot quad, just return that value */
+    if (parse_dotquad(name, &ip.addr)){
         Print(L"dot-quad IPv4 address given in file URL so no DNS lookup is needed: %d\n",q.ip);
-        return q.ip;
+        return ip.addr;
     }
 
     for (i=0; i++; i<DNS_MAX_SERVERS){
