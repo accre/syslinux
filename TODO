@@ -1,0 +1,1 @@
+* Support for DNS resolution in kernel and initrd file URLs needed when in UEFI [ see the EFI pxe_dns() function ]
