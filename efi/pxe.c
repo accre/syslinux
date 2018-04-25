@@ -32,13 +32,193 @@ int reset_pxe(void)
     return 0;
 }
 
+// Yanked from dnsresolv.c, FIXME: avoid code duplication
+/*
+ * parse the ip_str and return the ip address with *res.
+ * return true if the whole string was consumed and the result
+ * was valid.
+ *
+ */
+static bool parse_dotquad(const char *ip_str, uint32_t *res)
+{
+    const char *p = ip_str;
+    uint8_t part = 0;
+    uint32_t ip = 0;
+    int i;
+
+    for (i = 0; i < 4; i++) {
+        while (is_digit(*p)) {
+            part = part * 10 + *p - '0';
+            p++;
+        }
+        if (i != 3 && *p != '.')
+            return false;
+
+        ip = (ip << 8) | part;
+        part = 0;
+        p++;
+    }
+    p--;
+
+    *res = htonl(ip);
+    return *p == '\0';
+}
+
+void hexDump (char *desc, void *addr, int len) {
+    int i;
+    unsigned char buff[17];
+    unsigned char *pc = (unsigned char*)addr;
+
+    // Output description if given.
+    if (desc != NULL)
+        Print(L"%a:\n", desc);
+
+    if (len == 0) {
+        printf("  ZERO LENGTH\n");
+        return;
+    }
+    if (len < 0) {
+        printf("  NEGATIVE LENGTH: %i\n",len);
+        return;
+    }
+
+    // Process every byte in the data.
+    for (i = 0; i < len; i++) {
+        // Multiple of 16 means new line (with line offset).
+
+        if ((i % 16) == 0) {
+            // Just don't print ASCII for the zeroth line.
+            if (i != 0)
+                Print(L"  %a\n", buff);
+
+            // Output the offset.
+            Print(L"  %04x ", i);
+        }
+
+        // Now the hex code for the specific character.
+        Print(L" %02x", pc[i]);
+
+        // And store a printable ASCII character for later.
+        if ((pc[i] < 0x20) || (pc[i] > 0x7e))
+            buff[i % 16] = '.';
+        else
+            buff[i % 16] = pc[i];
+        buff[(i % 16) + 1] = '\0';
+    }
+
+    // Pad out last line if not exactly 16 characters.
+    while ((i % 16) != 0) {
+        Print(L"   ");
+        i++;
+    }
+
+    // And print the final ASCII bit.
+    Print(L"  %a\n", buff);
+}
+
 #define DNS_MAX_SERVERS 4		/* Max no of DNS servers */
 uint32_t dns_server[DNS_MAX_SERVERS] = {0, };
+
+uint32_t crude_dns_lookup(const char *name)
+{
+#define DNS_BUF_SIZE 2048
+    struct pxe_pvt_inode socket;
+    unsigned char buf[DNS_BUF_SIZE] = {
+        // Header
+        0x42, 0x42, // ID
+        0x01, 0x00, // Flags & status, only set the RD flag to request recursion
+        0x00, 0x01, // Question count
+        0x00, 0x00, // Answer count
+        0x00, 0x00, // Authority count
+        0x00, 0x00, // Additional count
+    };
+    unsigned char *query, *nptr;
+    uint16_t len = 12, n, err, hack;
+    //uint32_t nsip = htonl(0x0A000001); // 10.0.0.1
+    uint32_t nsip = dns_server[0];
+    uint16_t nsport = 53;
+    uint32_t src_ip;
+    uint16_t src_port;
+    uint32_t out, status;
+
+    if (!nsip){
+        Print(L"No DNS servers provided by DHCP, not attempting DNS resolution\n");
+        return; // We could attempt a public nameserver instead like Google's 8.8.8.8 however that might introduce some security/privacy concerns?
+    }
+
+    /* convert hostname into suitable query format. */
+    query = buf + len;
+    do {
+      nptr = query;
+      ++query;
+      for(n = 0; *name != '.' && *name != 0; ++name) {
+        *query = *name;
+        ++query;
+        ++n;
+      }
+      *nptr = n;
+    } while(*(name++) != 0);
+    *query++ ='\0';
+
+    *query++ = 0x00; *query++ = 0x01; // Q type: ask for 'A' record
+    *query++ = 0x00; *query++ = 0x01; // Q class: IN internet class
+
+    hack = len = query - buf;
+
+    core_udp_open(&socket);
+    Print(L"Test: socket open\n");
+    hexDump("Sending",buf,len);
+    core_udp_sendto(&socket, buf, len, nsip, nsport);
+    Print(L"Test: packet sent\n");
+    len = DNS_BUF_SIZE;
+    err = core_udp_recv(&socket, buf, &len, &src_ip, &src_port);
+    Print(L"Test: got response packet of length %d\n", len);
+    hexDump("Recieved",buf,len);
+    status = buf[3] & 0x0F;
+    out = *(uint32_t)(buf[hack + 12]);
+    Print(L"...status: %x  IP: %x.%x.%x.%x %d\n", buf[3] & 0x0F, buf[hack + 12], buf[hack + 13], buf[hack + 14], buf[hack + 15], ntohl(out));
+    //core_udp_disconnect(socket);
+    //core_udp_connect(socket, src_ip, src_port);
+    //core_udp_send(socket, &err_buf, 4 + len + 1);
+    core_udp_close(&socket);
+    Print(L"Test: socket closed\n");
+
+    if (status == 0){
+      return out;
+    } else {
+      Print(L"Problem with DNS lookup, status: %d\n",status);
+      return 0;
+    }
+}
+
+uint32_t dump_avail_uefi_protocol_guid()
+{
+    EFI_HANDLE *handles;
+    EFI_STATUS status;
+    UINTN nr_handles, nr_protocols, hidx, pidx;
+    EFI_GUID **protocol_guids;
+
+    status = LibLocateHandle(AllHandles, NULL, NULL, &nr_handles, &handles);
+    if (status != EFI_SUCCESS) {
+	    Print(L"\nError listing UEFI Handles available\n");
+    }else{
+	    Print(L"\nFound %d UEFI Handles available\n", nr_handles);
+        for (hidx=0; hidx < nr_handles; hidx++){
+            status = uefi_call_wrapper(BS->ProtocolsPerHandle, 3, handles[hidx], &protocol_guids, &nr_protocols);
+            Print(L"\nHandle %d supports %d protocols\n",hidx,nr_protocols);
+            for (pidx=0; pidx < nr_protocols; pidx++){
+                Print(L"GUID: %x %x %x %x",protocol_guids[pidx]->Data1,protocol_guids[pidx]->Data2,protocol_guids[pidx]->Data3,protocol_guids[pidx]->Data4[0]);
+            }
+        }
+    }
+
+    return 0;
+}
 
 __export uint32_t pxe_dns(const char *name)
 {
     uint32_t i;
-    struct ip_addr ip;
+    uint32_t ip;
 
     /*
      * Return failure on an empty input... this can happen during
@@ -46,22 +226,23 @@ __export uint32_t pxe_dns(const char *name)
      * check for it.
      */
     if (!name || !*name){
-        Print(L"No hostname in file URL therefore no DNS lookup needed\n");
+        Print(L"\nNo hostname in file URL therefore no DNS lookup needed\n");
         return 0;
     }
 
     /* If it is a valid dot quad, just return that value */
-    if (parse_dotquad(name, &ip.addr)){
-        Print(L"dot-quad IPv4 address given in file URL so no DNS lookup is needed: %d\n",q.ip);
-        return ip.addr;
+    if (parse_dotquad(name, &ip)){
+        Print(L"\ndot-quad IPv4 address given in file URL so no DNS lookup is needed: %d\n",ip);
+        return ip;
     }
 
-    for (i=0; i++; i<DNS_MAX_SERVERS){
-        Print(L"DNS server %d is %d\n",i,dns_server[i]);
+    for (i=0; i<DNS_MAX_SERVERS; i++){
+        Print(L"\nDNS server %d is %d\n",i,dns_server[i]);
     }
 
-    Print(L"WARNING: file URLs needing DNS resolution not yet supported within UEFI boot\nExpect the PXE server IP to be used as a fallback\n");
-    return 0;
+    Print(L"\nWARNING: file URLs needing DNS resolution not yet supported within UEFI boot\nExpect the PXE server IP to be attempted as a fallback\n");
+
+    return crude_dns_lookup(name);
 }
 
 int pxe_init(bool quiet)
