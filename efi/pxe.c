@@ -30,7 +30,7 @@ void gpxe_init(void) {}
 void pxe_idle_init(void) {
     EFI_STATUS status;
 
-    printf("Resetting EFI watchdog timer to 10 minutes\n");
+    Print("Resetting EFI watchdog timer to 10 minutes\n");
     status = uefi_call_wrapper(BS->SetWatchdogTimer, 4, 600, 0x424242,
                    sizeof(L"SYSLINUX EFI PXE"), L"SYSLINUX EFI PXE");
     if (status != EFI_SUCCESS) {
