@@ -152,6 +152,7 @@ uint32_t crude_dns_lookup(const char *name)
     uint32_t src_ip;
     uint16_t src_port;
     uint32_t out, status;
+    char strbuf[64];
 
     if (!nsip){
         Print(L"No DNS servers provided by DHCP, not attempting DNS resolution\n");
@@ -188,7 +189,13 @@ uint32_t crude_dns_lookup(const char *name)
     hexDump("Received",buf,len);
     status = buf[3] & 0x0F;
     out = *(uint32_t *)(buf + hack + 12);
-    Print(L"...status: %x  IP: %u.%u.%u.%u %d\n", buf[3] & 0x0F, buf[hack + 12] & 0x0F, buf[hack + 13] & 0x0F, buf[hack + 14] & 0x0F, buf[hack + 15] & 0x0F, ntohl(out));
+
+    sprintf(strbuf, "%u.%u.%u.%u",
+            buf[hack + 12],
+            buf[hack + 13],
+            buf[hack + 14],
+            buf[hack + 15]);
+    Print(L"...status: %x  IP: %a %d\n", buf[3] & 0x0F, strbuf, ntohl(out));
     //core_udp_disconnect(socket);
     //core_udp_connect(socket, src_ip, src_port);
     //core_udp_send(socket, &err_buf, 4 + len + 1);
