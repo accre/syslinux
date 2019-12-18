@@ -143,7 +143,7 @@ uint32_t crude_dns_lookup(const char *name)
 
     if (!nsip){
         Print(L"No DNS servers provided by DHCP, not attempting DNS resolution\n");
-        return; // We could attempt a public nameserver instead like Google's 8.8.8.8 however that might introduce some security/privacy concerns?
+        return 0; // We could attempt a public nameserver instead like Google's 8.8.8.8 however that might introduce some security/privacy concerns?
     }
 
     /* convert hostname into suitable query format. */
@@ -173,9 +173,9 @@ uint32_t crude_dns_lookup(const char *name)
     len = DNS_BUF_SIZE;
     err = core_udp_recv(&socket, buf, &len, &src_ip, &src_port);
     Print(L"Test: got response packet of length %d\n", len);
-    hexDump("Recieved",buf,len);
+    hexDump("Received",buf,len);
     status = buf[3] & 0x0F;
-    out = *(uint32_t)(buf[hack + 12]);
+    out = *(uint32_t *)(buf + hack + 12);
     Print(L"...status: %x  IP: %x.%x.%x.%x %d\n", buf[3] & 0x0F, buf[hack + 12], buf[hack + 13], buf[hack + 14], buf[hack + 15], ntohl(out));
     //core_udp_disconnect(socket);
     //core_udp_connect(socket, src_ip, src_port);
