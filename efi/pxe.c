@@ -179,14 +179,20 @@ uint32_t crude_dns_lookup(const char *name)
     hack = len = query - buf;
 
     core_udp_open(&socket);
-    Print(L"Test: socket open\n");
-    hexDump("Sending",buf,len);
-    core_udp_sendto(&socket, buf, len, nsip, nsport);
-    Print(L"Test: packet sent\n");
+////    Print(L"Test: socket open\n");
+////    hexDump("Sending",buf,len);
+ 	// sendto is odd, it seems to say it requires an already open socket but then open a new second socket instance
+	// try replacing with connect+send+disconnect
+	//   core_udp_sendto(&socket, buf, len, nsip, nsport);
+
+	core_udp_disconnect(&socket);   // test, seems to be how other code does things but I'm not sure why yet
+	core_udp_connect(&socket, nsip, nsport);
+	core_udp_send(&socket, buf, len);
+////   Print(L"Test: packet sent\n");
     len = DNS_BUF_SIZE;
     err = core_udp_recv(&socket, buf, &len, &src_ip, &src_port);
-    Print(L"Test: got response packet of length %d\n", len);
-    hexDump("Received",buf,len);
+////    Print(L"Test: got response packet of length %d\n", len);
+////    hexDump("Received",buf,len);
     status = buf[3] & 0x0F;
     out = *(uint32_t *)(buf + hack + 12);
 
@@ -195,12 +201,13 @@ uint32_t crude_dns_lookup(const char *name)
             buf[hack + 13],
             buf[hack + 14],
             buf[hack + 15]);
-    Print(L"...status: %x  IP: %a %d\n", buf[3] & 0x0F, strbuf, ntohl(out));
+///    Print(L"...status: %x  IP: %a %d\n", buf[3] & 0x0F, strbuf, ntohl(out));
     //core_udp_disconnect(socket);
     //core_udp_connect(socket, src_ip, src_port);
     //core_udp_send(socket, &err_buf, 4 + len + 1);
+	core_udp_disconnect(&socket);
     core_udp_close(&socket);
-    Print(L"Test: socket closed\n");
+////    Print(L"Test: socket closed\n");
 
     if (status == 0){
       return out;
@@ -256,10 +263,10 @@ __export uint32_t pxe_dns(const char *name)
     }
 
     for (i=0; i<DNS_MAX_SERVERS; i++){
-        Print(L"\nDNS server %d is %d\n",i,dns_server[i]);
+////        Print(L"\nDNS server %d is %d\n",i,dns_server[i]);
     }
 
-    Print(L"\nWARNING: file URLs needing DNS resolution not yet supported within UEFI boot\nExpect the PXE server IP to be attempted as a fallback\n");
+////    Print(L"\nWARNING: file URLs needing DNS resolution not yet supported within UEFI boot\nExpect the PXE server IP to be attempted as a fallback\n");
 
     return crude_dns_lookup(name);
 }
