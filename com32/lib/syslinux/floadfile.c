@@ -38,7 +38,15 @@
 #include <fcntl.h>
 #include <sys/stat.h>
 
+///test
+#include <string.h>
+#include <console.h>
+#include <dprintf.h>
+
 #include <syslinux/loadfile.h>
+
+/// needed to make printf work?
+#include "core.h"
 
 #define INCREMENTAL_CHUNK 1024*1024
 
@@ -75,6 +83,7 @@ int floadfile(FILE * f, void **ptr, size_t * len, const void *prefix,
 
 	    rlen = fread((char *)data + clen, 1, alen - clen, f);
 	    clen += rlen;
+        printf("%uKiB...",(unsigned int)clen >> 10);
 	} while (clen == alen);
 
 	*len = clen;
@@ -84,6 +93,7 @@ int floadfile(FILE * f, void **ptr, size_t * len, const void *prefix,
 	    data = dp;
 	*ptr = data;
     } else {
+
 	*len = clen = st.st_size + prefix_len - ftell(f);
 	xlen = (clen + LOADFILE_ZERO_PAD - 1) & ~(LOADFILE_ZERO_PAD - 1);
 
