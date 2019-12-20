@@ -13,8 +13,9 @@
 VPATH = $(SRC)
 include $(MAKEDIR)/elf.mk
 
+COM32LIB = $(objdir)/com32/lib/libcom32min.a
 CFLAGS += -I$(topdir)/core/elflink -I$(topdir)/core/include -I$(topdir)/com32/lib -fvisibility=hidden
-LIBS = --whole-archive $(objdir)/com32/lib/libcom32min.a
+LIBS = --whole-archive $(COM32LIB)
 
 OBJS = ldlinux.o cli.o readconfig.o refstr.o colors.o getadv.o adv.o \
 	execute.o chainboot.o kernel.o get_key.o advwrite.o setadv.o \
@@ -32,8 +33,8 @@ endif
 
 all: $(BTARGET) ldlinux_lnx.a
 
-ldlinux.elf : $(OBJS)
-	$(LD) $(LDFLAGS) -soname $(SONAME) -o $@ $^ $(LIBS)
+ldlinux.elf : $(OBJS) $(COM32LIB)
+	$(LD) $(LDFLAGS) -soname $(SONAME) -o $@ $(OBJS) $(LIBS)
 
 LNXCFLAGS += -D__export='__attribute__((visibility("default")))'
 LNXLIBOBJS = get_key.lo
