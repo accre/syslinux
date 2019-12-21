@@ -52,6 +52,7 @@ int core_tcp_connect(struct pxe_pvt_inode *socket, uint32_t ip, uint16_t port)
     EFI_TCP4_CONNECTION_TOKEN token;
     EFI_TCP4_ACCESS_POINT *ap;
     EFI_TCP4_CONFIG_DATA tdata;
+    EFI_TCP4_OPTION * topts;
     struct efi_binding *b = socket->net.efi.binding;
     EFI_STATUS status;
     EFI_TCP4 *tcp = (EFI_TCP4 *)b->this;
@@ -60,6 +61,17 @@ int core_tcp_connect(struct pxe_pvt_inode *socket, uint32_t ip, uint16_t port)
     jiffies_t start, last, cur;
 
     memset(&tdata, 0, sizeof(tdata));
+
+    topts = malloc(sizeof(*topts));
+    memset(topts, 0, sizeof(*topts));
+    topts->ReceiveBufferSize = 49152;
+    topts->SendBufferSize = 49152;
+    //topts->EnableWindowScaling = TRUE;
+    //topts->EnableTimeStamp = TRUE;
+    //topts->EnableSelectiveAck = TRUE;
+    //topts->EnableNagle = TRUE;
+    //topts->EnableEnablePathMtudiscovery = TRUE;
+    tdata.ControlOption = topts;
 
     ap = &tdata.AccessPoint;
     ap->UseDefaultAddress = TRUE;
@@ -83,12 +95,22 @@ int core_tcp_connect(struct pxe_pvt_inode *socket, uint32_t ip, uint16_t port)
 	    }
 	} else {
 	    if (status != EFI_SUCCESS)
-		Print(L"core_tcp_connect: tcp->Configure() unsuccessful (%d)", status);
+		Print(L"core_tcp_connect: tcp->Configure() unsuccessful (%d)\n", status);
 	    unmapped = 0;
 	}
     }
     if (status != EFI_SUCCESS)
 	return -1;
+
+    // debug
+	status = uefi_call_wrapper(tcp->GetModeData, 6, tcp, NULL, &tdata, NULL, NULL, NULL);
+    if (status != EFI_SUCCESS) {
+        Print(L"GetModeData error\n");
+    }
+////    Print(L"default tcp opts: defined?  %d\n", tdata.ControlOption ? 1 : 0);
+////    Print(L"default tcp opts: rbuf %d, sbuf %d, winscale %d\n", tdata.ControlOption->ReceiveBufferSize, tdata.ControlOption->SendBufferSize, tdata.ControlOption->EnableWindowScaling ? 1 : 0);
+
+
 
     status = efi_setup_event(&token.CompletionToken.Event,
 			    (EFI_EVENT_NOTIFY)tcp_cb, &token.CompletionToken);
