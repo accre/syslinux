@@ -1,0 +1,25 @@
+gnu-efi is a Git Submodule
+
+My understanding is the latest upstream syslinux 6.0.4pre3 uses circa 2019:
+Subproject commit d34132e62f666904158c7ec2f1eef5a9d5281c36
+
+I last compiled the ACCRE syslinux 6.0.4pre1 with circa 2014:
+Subproject commit ab54e2b40e914d0ca01dc3d44c8d4eb8517bf999
+
+
+I think I will attempt a compile with circa 2023 gnu-efi....
+
+
+
+
+Build:
+
+"make clean" misses cleaning up a lot of files, and you will get confusing errors from old stale *.o files
+Instead run "make spotless"
+
+TL;DR:
+
+make spotless
+make all
+make install INSTALLROOT=/where/you/want/your/syslinux/files/
+
